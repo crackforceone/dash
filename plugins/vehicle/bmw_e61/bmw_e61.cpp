@@ -195,7 +195,9 @@ void bmw_e61::reversesensor(QByteArray payload) {
 
     }
 }
-//551
+
+
+//130 (CAN ID changed from 551 to 130)
 //(A, B, C, D, E, F, G, H)
 // D - Bitfield.
 
@@ -206,15 +208,22 @@ void bmw_e61::reversesensor(QByteArray payload) {
 //     0x00 / 0 - Engine shutting down (2500ms)
 //     0x20 / 32 - Engine off
 
+// Additional states being monitored:
+//     0x41, 0x45, 0x55 - Active states
+//     0x40, 0x00 - Trigger pause states
 
 void bmw_e61::engineUpdate(QByteArray payload){
-    if((payload.at(3) == 0x80)) engineRunning = true;
-    else
-    {
-        if(engineRunning)
-            this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PAUSE);
-        engineRunning = false;
+    static uint8_t previousState = 0xFF; // Track previous state
+    uint8_t currentState = static_cast<uint8_t>(payload.at(3));
+    
+    // Check for state change from active states (0x41, 0x45, 0x55) to pause states (0x40, 0x00)
+    if ((previousState == 0x41 || previousState == 0x45 || previousState == 0x55) &&
+        (currentState == 0x40 || currentState == 0x00)) {
+        this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PAUSE);
     }
+    
+    // Update previous state for next comparison
+    previousState = currentState;
 }
 
 //
@@ -234,6 +243,36 @@ void bmw_e61::reverseStateUpdate(QByteArray payload) {
       if(reverseState) {
           this->arbiter->set_curr_page(0); 
           reverseState = false;
+          
+          // Reset all parking sensors when exiting reverse mode
+          if(this->vehicle) {
+              // Reset front sensors
+              this->vehicle->sensor(Position::FRONT_LEFT, 0);
+              this->vehicle->sensor(Position::FRONT_MIDDLE_LEFT, 0);
+              this->vehicle->sensor(Position::FRONT_MIDDLE_RIGHT, 0);
+              this->vehicle->sensor(Position::FRONT_RIGHT, 0);
+              
+              // Reset back sensors
+              this->vehicle->sensor(Position::BACK_LEFT, 0);
+              this->vehicle->sensor(Position::BACK_MIDDLE_LEFT, 0);
+              this->vehicle->sensor(Position::BACK_MIDDLE_RIGHT, 0);
+              this->vehicle->sensor(Position::BACK_RIGHT, 0);
+              
+              // Also reset the sensor text if needed
+              this->vehicle->sensor_text(Position::FRONT_LEFT, "");
+              this->vehicle->sensor_text(Position::FRONT_MIDDLE_LEFT, "");
+              this->vehicle->sensor_text(Position::FRONT_MIDDLE_RIGHT, "");
+              this->vehicle->sensor_text(Position::FRONT_RIGHT, "");
+              
+              this->vehicle->sensor_text(Position::BACK_LEFT, "");
+              this->vehicle->sensor_text(Position::BACK_MIDDLE_LEFT, "");
+              this->vehicle->sensor_text(Position::BACK_MIDDLE_RIGHT, "");
+              this->vehicle->sensor_text(Position::BACK_RIGHT, "");
+              
+              if(DEBUG) {
+                  DASH_LOG(info) << "Exiting reverse mode - all sensors reset";
+              }
+          }
       }
   }
 }

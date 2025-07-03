@@ -159,7 +159,7 @@ Page *Session::Layout::next_enabled_page(Page *page) const
     return this->page(id);
 }
 
-const char *Session::System::VOLUME_CMD = "amixer set Master %1% --quiet";
+const char *Session::System::VOLUME_CMD = "pactl set-sink-volume @DEFAULT_SINK@ %1%";
 const char *Session::System::SHUTDOWN_CMD = "sudo shutdown -h now";
 const char *Session::System::REBOOT_CMD = "sudo shutdown -r now";
 
@@ -316,7 +316,7 @@ QWidget *Session::Forge::brightness_slider(bool buttons) const
 
     auto slider = new QSlider(Qt::Orientation::Horizontal);
     slider->setTracking(false);
-    slider->setRange(76, 255);
+    slider->setRange(5, 255);
     slider->setValue(this->arbiter_.system().brightness.value);
     QObject::connect(slider, &QSlider::sliderReleased, [this, slider]{
         this->arbiter_.set_brightness(slider->sliderPosition());

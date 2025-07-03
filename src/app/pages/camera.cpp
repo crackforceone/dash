@@ -568,7 +568,7 @@ void CameraPage::populate_local_cams()
     const QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
     for (auto const &cam : cameras) {
         QString pretty_name = cam.description() + " at " + cam.deviceName();
-        if (cam.description() == "USB Video: USB Video"){
+        if (cam.description() == "AFN_CAP: AFN_CAP"){
             this->local_cams.append(QPair<QString, QString>(pretty_name, cam.deviceName())); 
             this->config->set_cam_local_device(cam.deviceName()); 
         }
