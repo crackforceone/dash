@@ -2,6 +2,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QTimer>
 
 #include "app/arbiter.hpp"
 #include "app/session.hpp"
@@ -16,6 +17,9 @@ Server::Server(Arbiter &arbiter)
 {
     this->add_state_handlers();
     this->add_action_handlers();
+
+    this->broadcast_timer = new QTimer(this);
+    connect(this->broadcast_timer, &QTimer::timeout, [this]{ this->broadcast_nav_state(); });
 
     if (this->enabled_)
         this->start();
@@ -158,14 +162,37 @@ void Server::add_action_handlers()
 void Server::start()
 {
     this->listen(QHostAddress::Any, this->PORT);
+    if (this->broadcast_timer)
+        this->broadcast_timer->start(this->broadcast_interval_ms);
 }
 
 void Server::stop()
 {
+    if (this->broadcast_timer && this->broadcast_timer->isActive())
+        this->broadcast_timer->stop();
     this->close();
     for (auto client : this->clients)
         delete client;
     this->clients.clear();
+}
+
+void Server::broadcast_nav_state()
+{
+    QJsonObject resp;
+
+    auto handler = this->state_handlers.find("androidauto/nav");
+    if (handler == this->state_handlers.end())
+        return;
+
+    resp.insert("androidauto/nav", handler->state().toJsonValue());
+    if (handler->ext)
+        this->fill_resp(resp, handler->ext());
+
+    auto msg = QString(QJsonDocument(resp).toJson());
+    for (auto client : this->clients) {
+        if (client->requestUrl().path() == "/state")
+            client->sendTextMessage(msg);
+    }
 }
 
 void Server::fill_resp(QJsonObject &resp, QMap<QString, QVariant> entries) const

@@ -309,7 +309,8 @@ void CCCPage::populate_local_cams()
     const QList<QCameraInfo> cameras = QCameraInfo::availableCameras();
     for (auto const &cam : cameras) {
         QString pretty_name = cam.description() + " at " + cam.deviceName();
-        if (cam.description() == "UGREEN Camera: UGREEN Camera"){
+        //if (cam.description() == "UGREEN Camera: UGREEN Camera"){ //orig
+        if (cam.description() == "ESP UVC Device: UVC CAM1"){
             this->local_cams.append(QPair<QString, QString>(pretty_name, cam.deviceName())); 
             this->config->set_cam_ccc_device(cam.deviceName()); 
         }
@@ -398,44 +399,38 @@ void CCCPage::connect_local_stream()
     qDebug() << "camera status: " << this->local_cam->status();
 
     QSize res = this->choose_video_resolution();
+    if (!res.isValid()) {
+        // Fallback to the known-good CLI resolution so caps are never 0x0.
+        res = QSize(400, 240);
+    }
 
 
     QSize screenSize = QGuiApplication::primaryScreen()->size();
-    int x = (screenSize.width() - res.width()) / 2;
+    //int x = (screenSize.width() - res.width()) / 2;
+    int x = 380;
     int y = 0;
-    int width = res.width();
-    int height = res.height();
+    //int width = res.width(); //orig
+    //int height = res.height(); /orig
+    int width = 1200;
+    int height = 720;
 
-    // Get plane ID from DRM
-    int planeId = 93; // Default fallback
-    int fd = ::open("/dev/dri/card0", O_RDWR);  // Use global open() function
-    if (fd >= 0) {
-        drmModePlaneRes* planes = drmModeGetPlaneResources(fd);
-        if (planes && planes->count_planes > 1) {
-            drmModePlane* plane = drmModeGetPlane(fd, planes->planes[1]);
-            if (plane) {
-                planeId = plane->plane_id;
-                drmModeFreePlane(plane);
-            }
-            drmModeFreePlaneResources(planes);
-        }
-        ::close(fd);  // Also use global close()
-    }  
+    // Use the plane that works for CLI testing; the DRM probe above was landing on
+    // an unusable plane and kmssink would never present video.
+    int planeId = 79;
 
 
 
     DASH_LOG(info) << "[CCCPage] Creating GStreamer pipeline with " << this->config->get_cam_ccc_device().toStdString();
     std::string pipeline = "v4l2src device=" + this->config->get_cam_ccc_device().toStdString() +
-                           " ! capsfilter caps=\"video/x-raw,width=1481" + ",height=720" + ";image/jpeg,width=" + std::to_string(res.width()) + ",height=" + std::to_string(res.height()) + "\"" +
+                           " ! image/jpeg,width=" + std::to_string(res.width()) +
+                           ",height=" + std::to_string(res.height()) + ",framerate=15/1" +
                            " ! mppjpegdec ! mpph264enc ! h264parse ! mppvideodec format=RGB" +
-                           //" ! kmssink plane-id=79 skip-vsync=true render-rectangle=\"<320, 0, 1280, 720>\"";
-                           " ! kmssink plane-id=" +
-                           std::to_string(planeId) +
+                           " ! kmssink plane-id=" + std::to_string(planeId) +
                            " bus-id=display-subsystem skip-vsync=true" +
-                           " render-rectangle=\"<" + 
-                            std::to_string(x) + ", " + 
-                            std::to_string(y) + ", " + 
-                            std::to_string(width) + ", " + 
+                           " render-rectangle=\"<" +
+                            std::to_string(x) + ", " +
+                            std::to_string(y) + ", " +
+                            std::to_string(width) + ", " +
                             std::to_string(height) + ">\"";
 
     init_gstreamer_pipeline(pipeline);
@@ -457,7 +452,11 @@ void CCCPage::connect_local_stream()
     //GstElement *capsFilter = gst_bin_get_by_name(GST_BIN(vidPipeline_), "mycapsfilter");
     //GstPad *convertPad = gst_element_get_static_pad(capsFilter, "sink");
     //gst_pad_add_probe(convertPad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, &CCCPage::convertProbe, this, nullptr);
-    gst_element_set_state(vidPipeline_, GST_STATE_PLAYING);
+    GstStateChangeReturn stateRet = gst_element_set_state(vidPipeline_, GST_STATE_PLAYING);
+    if (stateRet == GST_STATE_CHANGE_FAILURE) {
+        DASH_LOG(error) << "[CCCPage] Failed to set pipeline to PLAYING";
+        this->status->setText("Pipeline failed to start");
+    }
 }
 
 gboolean CCCPage::busCallback(GstBus *, GstMessage *message, gpointer *)
@@ -494,7 +493,8 @@ gboolean CCCPage::busCallback(GstBus *, GstMessage *message, gpointer *)
 
 QSize CCCPage::choose_video_resolution()
 {
-    QSize window_size(1280, 720);
+    //QSize window_size(1280, 720); //orig
+    QSize window_size(400, 240);
     QCameraImageCapture imageCapture(this->local_cam);
     int min_gap = 10000, xgap, ygap;
     QSize max_fit;

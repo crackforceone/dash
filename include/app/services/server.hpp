@@ -8,6 +8,7 @@
 #include <QVariant>
 #include <QWebSocket>
 #include <QWebSocketServer>
+#include <QTimer>
 
 class Arbiter;
 
@@ -42,6 +43,8 @@ class Server : public QWebSocketServer
     QMap<QString, StateHandler> state_handlers;
     QMap<QString, ActionHandler> action_handlers;
     bool enabled_;
+    QTimer *broadcast_timer = nullptr;
+    int broadcast_interval_ms = 500;
 
     void add_state_handlers();
     void add_action_handlers();
@@ -50,6 +53,7 @@ class Server : public QWebSocketServer
     void fill_resp(QJsonObject &resp, QMap<QString, QVariant> entries) const;
     void handle_state_msg(QWebSocket *client, QString msg) const;
     void handle_action_msg(QWebSocket *client, QString msg) const;
+    void broadcast_nav_state();
 
    signals:
     void changed(bool enabled);

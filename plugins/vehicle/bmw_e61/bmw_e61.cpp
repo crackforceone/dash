@@ -31,7 +31,7 @@ bool bmw_e61::init(ICANBus* canbus){
         canbus->registerFrameHandler(0x60D, [this](QByteArray payload){this->monitorHeadlightStatus(payload);});
         canbus->registerFrameHandler(0x54B, [this](QByteArray payload){this->updateClimateDisplay(payload);});
         canbus->registerFrameHandler(0x542, [this](QByteArray payload){this->updateTemperatureDisplay(payload);});
-        canbus->registerFrameHandler(0x551, [this](QByteArray payload){this->engineUpdate(payload);});
+        canbus->registerFrameHandler(0x130, [this](QByteArray payload){this->engineUpdate(payload);});
         canbus->registerFrameHandler(0x385, [this](QByteArray payload){this->tpmsUpdate(payload);});
         canbus->registerFrameHandler(0x354, [this](QByteArray payload){this->brakePedalUpdate(payload);});
         canbus->registerFrameHandler(0x002, [this](QByteArray payload){this->steeringWheelUpdate(payload);});
@@ -310,37 +310,27 @@ aasdk::proto::enums::ButtonCode::ENTER) != buttonCodes.end());
 
 
 void bmw_e61::mflUpdate(QByteArray payload) {
-   // Up button - NEXT
-   if(payload.at(0) == 0xE0 && payload.at(1) == 0x0C) {
-       if(!upButton)
-           this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::NEXT);
-       upButton = true;
-   }
-   else upButton = false;
+    static uint16_t previousMFL = 0xC00C; // Normal state: C0 0C
+    uint16_t currentMFL = (payload.at(0) << 8) | payload.at(1);
 
-   // Down button - PREV
-   if(payload.at(0) == 0xD0 && payload.at(1) == 0x0C) {
-       if(!downButton)
-           this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PREV);
-       downButton = true;
-   }
-   else downButton = false;
+    if (previousMFL == 0xC000 && currentMFL != 0xC000) {
+        switch (currentMFL) {
+            case 0xE000: // Up button
+                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::NEXT);
+                break;
+            case 0xD000: // Down button
+                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PREV);
+                break;
+            case 0xC100: // Tel button
+                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PHONE);
+                break;
+            case 0xC001: // Voice button
+                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::MICROPHONE_1);
+                break;
+        }
+    }
 
-   // Tel button - PHONE
-   if(payload.at(0) == 0xC1 && payload.at(1) == 0x0C) {
-       if(!telButton)
-           this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PHONE);
-       telButton = true;
-   }
-   else telButton = false;
-
-   // Voice button - MICROPHONE_1
-   if(payload.at(0) == 0xC0 && payload.at(1) == 0x0D) {
-       if(!voiceButton)
-           this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::MICROPHONE_1);
-       voiceButton = true;
-   }
-   else voiceButton = false;
+    previousMFL = currentMFL;
 }
 
 
