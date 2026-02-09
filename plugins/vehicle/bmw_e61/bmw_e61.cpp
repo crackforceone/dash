@@ -297,40 +297,43 @@ aasdk::proto::enums::ButtonCode::ENTER) != buttonCodes.end());
 */
 
 
-//Can-ID	Length	DATA Packet HEX	DATA Packet DECIMAL	Register Desctiprion
-//1D6	2	C0 0C	192 012	No keys prerssed (Continual ping)
-//1D6	2	C8 0C	200 012	Volume up
-//1D6	2	C4 0C	196 012	Volume down
-//1D6	2	E0 0C	224 012	Up Button
-//1D6	2	D0 0C	208 012	Down Button
-//1D6	2	C1 0C	193 012	Telephone Button
-//1D6	2	C0 0D	192 013	Voice button
-//1D6	2	C0 1C	192 028	Rotate Button
-//1D6	2	C0 4C	192 076	Disk Button
+//Can-ID	Length	Packet  Desctiprion
+//1D6	2	C0 00	No keys prerssed (Continual ping)
+//1D6	2	E0 00	Up Button
+//1D6	2	D0 00	Down Button
+//1D6	2	C1 00	Telephone Button
+//1D6	2	C0 01	Voice button
 
 
 void bmw_e61::mflUpdate(QByteArray payload) {
-    static uint16_t previousMFL = 0xC00C; // Normal state: C0 0C
-    uint16_t currentMFL = (payload.at(0) << 8) | payload.at(1);
+    static uint8_t previousByte0 = 0xC0; // Normal state byte 0: C0
+    static uint8_t previousByte1 = 0x00; // Normal state byte 1: 00
+    
+    uint8_t currentByte0 = static_cast<uint8_t>(payload.at(0));
+    uint8_t currentByte1 = static_cast<uint8_t>(payload.at(1));
 
-    if (previousMFL == 0xC000 && currentMFL != 0xC000) {
-        switch (currentMFL) {
-            case 0xE000: // Up button
-                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::NEXT);
-                break;
-            case 0xD000: // Down button
-                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PREV);
-                break;
-            case 0xC100: // Tel button
-                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PHONE);
-                break;
-            case 0xC001: // Voice button
-                this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::MICROPHONE_1);
-                break;
+    // Detect button press when transitioning from normal state (C0 00) to button state
+    if (previousByte0 == 0xC0 && previousByte1 == 0x00) {
+        if (currentByte0 == 0xE0 && currentByte1 == 0x00) {
+            // Up button
+            this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::NEXT);
+        }
+        else if (currentByte0 == 0xD0 && currentByte1 == 0x00) {
+            // Down button
+            this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PREV);
+        }
+        else if (currentByte0 == 0xC1 && currentByte1 == 0x00) {
+            // Tel button
+            this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::PHONE);
+        }
+        else if (currentByte0 == 0xC0 && currentByte1 == 0x01) {
+            // Voice button
+            this->aa_handler->injectButtonPress(aasdk::proto::enums::ButtonCode::MICROPHONE_1);
         }
     }
 
-    previousMFL = currentMFL;
+    previousByte0 = currentByte0;
+    previousByte1 = currentByte1;
 }
 
 

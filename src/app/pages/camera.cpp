@@ -716,12 +716,16 @@ void CameraPage::connect_local_stream()
     QSize res = this->choose_video_resolution();
 
     QSize screenSize = QGuiApplication::primaryScreen()->size();
-    int x = 68;
-    int y = -58;
+    //int x = 68;
+    //int y = -58;
+    int x = 320;
+    int y = 0;
+
+
     //int width = videoContainer_->width();
     //int height = videoContainer_->height();
-    int width = 1480;
-    int height = 836;
+    int width = 1280;
+    int height = 720;
     //int width = 1480;
     //int height = 840;
 
@@ -799,7 +803,7 @@ gboolean CameraPage::busCallback(GstBus *, GstMessage *message, gpointer *)
 
 QSize CameraPage::choose_video_resolution()
 {
-    QSize window_size(1360, 768);
+    QSize window_size(1280, 720);
     //QSize window_size = this->size();
     QCameraImageCapture imageCapture(this->local_cam);
     int min_gap = 10000, xgap, ygap;
